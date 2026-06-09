@@ -54,7 +54,7 @@ All routes prefixed `/api/v1`:
 
 | Variable | Source | Required |
 |----------|--------|----------|
-| `DATABASE_URL` | `backend/.env` | Yes |
+| `DATABASE_URL` | `backend/.env` | No (default: sqlite+aiosqlite:///weekendplanner.db) |
 | `GOOGLE_PLACES_API_KEY` | `backend/.env` | Yes |
 | `SECRET_KEY` | `backend/.env` | Yes |
 | `ENVIRONMENT` | `backend/.env` | No (default: development) |
@@ -84,18 +84,18 @@ All routes prefixed `/api/v1`:
 ## Verification
 
 - `pytest backend/tests/` — unit tests
-- `python -m uvicorn app.main:app --port 8000` — start backend locally (SQLite)
-- `docker compose up postgres backend -d` — start services (PostgreSQL)
-- `docker compose exec backend python -m app.scrapers.seed` — seed data
+- `python -m uvicorn app.main:app --port 8002` — start backend locally (SQLite). Vite dev proxy points here.
+- `docker compose up postgres backend -d` — start services (PostgreSQL, exposed on 8000)
+- `python -m app.scrapers.seed_local` — seed local activities on first run (auto-seeded in development)
 
 ## Running Locally (Development)
 
 ```bash
 cd backend
-python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+python -m uvicorn app.main:app --host 0.0.0.0 --port 8002
 ```
 
-Backend runs at `http://localhost:8000`. Uses SQLite (`weekendplanner.db`) by default.
+Backend runs at `http://localhost:8002`. Uses SQLite (`weekendplanner.db`) by default. The dev environment auto-seeds 100 activities on first start when the table is empty.
 
 ## Child DOX Index
 

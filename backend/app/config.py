@@ -3,7 +3,7 @@ from functools import lru_cache
 
 
 class Settings(BaseSettings):
-    database_url: str = "postgresql+asyncpg://postgres:postgres@weekendplanner:5432/weekendplanner"
+    database_url: str = "sqlite+aiosqlite:///weekendplanner.db"
     google_places_api_key: str = ""
     secret_key: str = "changeme"
     environment: str = "development"

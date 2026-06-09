@@ -23,9 +23,16 @@ class ActivityService:
         date_to: Optional[datetime] = None,
         session_id: Optional[str] = None,
     ) -> list[Activity]:
-        """Get activities for selected cantons, sorted by learning model."""
+        """Get evergreen activities for selected cantons, sorted by learning model.
 
-        query = select(Activity).where(Activity.canton.in_(cantons))
+        Events are returned by the /events endpoint only; filtering to
+        ``type='evergreen'`` here keeps the deck from duplicating them.
+        """
+
+        query = select(Activity).where(
+            Activity.canton.in_(cantons),
+            Activity.type == "evergreen",
+        )
         result = await self.db.execute(query)
         activities = list(result.scalars().all())
 
@@ -70,17 +77,25 @@ class ActivityService:
         unseen = [a for a in evergreen if prefs.get(a.id, 0) == 0]
         if unseen:
             random.shuffle(unseen)
-            unseen_idx = 0
+            injected_ids = set()
 
             result = []
             evergreen_idx = 0
-            for i in range(len(evergreen) + len(events)):
+            unseen_idx = 0
+            total = len(evergreen) + len(events)
+            for i in range(total):
                 if i > 0 and i % 5 == 0 and unseen_idx < len(unseen):
                     result.append(unseen[unseen_idx])
+                    injected_ids.add(unseen[unseen_idx].id)
                     unseen_idx += 1
-                if evergreen_idx < len(evergreen):
-                    result.append(evergreen[evergreen_idx])
-                    evergreen_idx += 1
+                elif evergreen_idx < len(evergreen):
+                    # Advance past any already-injected (or already-appended) items
+                    while evergreen_idx < len(evergreen) and evergreen[evergreen_idx].id in injected_ids:
+                        evergreen_idx += 1
+                    if evergreen_idx < len(evergreen):
+                        result.append(evergreen[evergreen_idx])
+                        injected_ids.add(evergreen[evergreen_idx].id)
+                        evergreen_idx += 1
             return events + result
 
         return events + evergreen

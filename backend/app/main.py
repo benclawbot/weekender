@@ -7,13 +7,33 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy import select, func
 
 from app.config import get_settings
-from app.database import engine, Base
+from app.database import engine, Base, AsyncSessionLocal
 from app.api import activities, events, baskets, prefs
 from app.scrapers.scheduler import start_scheduler, stop_scheduler
+from app.models.activity import Activity
 
 settings = get_settings()
+
+
+async def _ensure_seed_data():
+    """Self-heal: if the activities table is empty, populate it from the
+    local seed. Production / docker installs with a real Google Places API
+    key will skip this because activities already exist (and quarterly
+    scraper takes over).
+    """
+    async with AsyncSessionLocal() as db:
+        result = await db.execute(select(func.count(Activity.id)))
+        count = result.scalar() or 0
+        if count > 0:
+            print(f"[startup] {count} activities already present — skipping auto-seed")
+            return
+
+    print("[startup] activities table empty — auto-seeding local data")
+    from app.scrapers.seed_local import seed as seed_local_data
+    await seed_local_data()
 
 
 @asynccontextmanager
@@ -21,6 +41,15 @@ async def lifespan(app: FastAPI):
     # Startup
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
+    # Local-dev self-heal: keep the DB usable even if it's been wiped.
+    if settings.environment == "development":
+        try:
+            await _ensure_seed_data()
+        except Exception as e:
+            # Never let the seed failure block startup — just log and continue.
+            print(f"[startup] auto-seed failed (continuing without): {e}")
+
     start_scheduler()
     yield
     # Shutdown

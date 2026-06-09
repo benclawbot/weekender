@@ -144,6 +144,8 @@ def _basket_to_response(basket: Basket) -> dict:
                 "tags": ba.activity.tags or [],
                 "duration_hint": ba.activity.duration_hint,
                 "pref_score": 0,
+                "date_from": ba.activity.date_from.isoformat() if ba.activity.date_from else None,
+                "date_to": ba.activity.date_to.isoformat() if ba.activity.date_to else None,
             }
             for ba in basket.activities
         ],

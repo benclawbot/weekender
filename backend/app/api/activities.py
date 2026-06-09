@@ -29,12 +29,21 @@ async def list_activities(
     service = ActivityService(db)
     activities = await service.get_activities(canton_list, date_from_dt, date_to_dt, session_id)
 
+    # Pull prefs for the response payload so the client can sort on it too.
+    pref_scores: dict[str, int] = {}
+    if session_id:
+        from sqlalchemy import select
+        from app.models.activity import Pref
+        pref_rows = await db.execute(select(Pref).where(Pref.session_id == session_id))
+        for p in pref_rows.scalars():
+            pref_scores[p.activity_id] = p.score
+
     return [
-        _activity_to_response(a, service) for a in activities
+        _activity_to_response(a, service, pref_scores.get(a.id, 0)) for a in activities
     ]
 
 
-def _activity_to_response(activity, service: ActivityService) -> dict:
+def _activity_to_response(activity, service: ActivityService, pref_score: int = 0) -> dict:
     return {
         "id": activity.id,
         "title": activity.title,
@@ -49,7 +58,7 @@ def _activity_to_response(activity, service: ActivityService) -> dict:
         "website": activity.website,
         "tags": activity.tags or [],
         "duration_hint": activity.duration_hint,
-        "pref_score": 0,
+        "pref_score": pref_score,
         "date_from": activity.date_from.isoformat() if activity.date_from else None,
         "date_to": activity.date_to.isoformat() if activity.date_to else None,
         "source_url": activity.source_url,

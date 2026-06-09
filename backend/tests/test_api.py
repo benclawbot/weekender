@@ -1,14 +1,37 @@
 import pytest
 import pytest_asyncio
 from httpx import AsyncClient, ASGITransport
+from sqlalchemy import delete
+
 from app.main import app
+from app.database import AsyncSessionLocal
+from app.models.activity import Activity, Pref, Basket, BasketActivity
 
 
 @pytest_asyncio.fixture
 async def client():
+    """Client fixture that wipes volatile tables (prefs/baskets) before
+    each test. Activities are left intact because they're the seed dataset
+    the API queries against.
+    """
+    async with AsyncSessionLocal() as db:
+        await db.execute(delete(Pref))
+        await db.execute(delete(BasketActivity))
+        await db.execute(delete(Basket))
+        await db.commit()
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
+
+
+@pytest_asyncio.fixture(autouse=True)
+async def _cleanup_after():
+    yield
+    async with AsyncSessionLocal() as db:
+        await db.execute(delete(Pref))
+        await db.execute(delete(BasketActivity))
+        await db.execute(delete(Basket))
+        await db.commit()
 
 
 @pytest.mark.asyncio
