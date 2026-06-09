@@ -281,9 +281,32 @@ function SwipeCard({
         </div>
         <p className="text-sm text-muted mt-2 line-clamp-2">{activity.address || 'Address not available'}</p>
 
-        {/* Links */}
+        {/* Primary link — type-aware. Drag is bound to the parent card, so the
+            anchor only fires when the user actually taps it (clicks bubble up
+            to the anchor; drags are captured by the gesture handler). */}
+        {activity.type === 'event' && activity.source_url ? (
+          <a
+            href={activity.source_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-3 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-text text-bg text-sm font-medium"
+          >
+            Voir sur agenda.ch ↗
+          </a>
+        ) : activity.type === 'evergreen' && activity.maps_url ? (
+          <a
+            href={activity.maps_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-3 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-text text-bg text-sm font-medium"
+          >
+            Voir sur Maps ↗
+          </a>
+        ) : null}
+
+        {/* Secondary links */}
         <div className="flex gap-3 mt-3">
-          {activity.maps_url && (
+          {activity.type === 'event' && activity.maps_url && (
             <a
               href={activity.maps_url}
               target="_blank"

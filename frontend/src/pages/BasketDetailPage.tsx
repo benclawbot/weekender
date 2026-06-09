@@ -72,22 +72,35 @@ export default function BasketDetailPage() {
               </p>
             </div>
             <div className="flex gap-2 flex-shrink-0">
+              {activity.type === 'event' && activity.source_url && (
+                <a
+                  href={activity.source_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-9 h-9 rounded-full bg-bg border border-border flex items-center justify-center text-sm"
+                  aria-label="Open event source"
+                >
+                  📅
+                </a>
+              )}
               {activity.maps_url && (
                 <a
                   href={activity.maps_url}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="w-9 h-9 rounded-full bg-bg border border-border flex items-center justify-center text-sm"
+                  aria-label="Open in Maps"
                 >
                   🗺
                 </a>
               )}
-              {activity.website && (
+              {activity.type === 'evergreen' && activity.website && (
                 <a
                   href={activity.website}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="w-9 h-9 rounded-full bg-bg border border-border flex items-center justify-center text-sm"
+                  aria-label="Open website"
                 >
                   ↗
                 </a>

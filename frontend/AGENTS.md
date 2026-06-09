@@ -105,7 +105,7 @@ npm install   # first time only
 npm run dev   # starts on http://localhost:5173
 ```
 
-Requires backend running at `http://localhost:8000` (or set `VITE_API_URL` in `frontend/.env`).
+Requires backend running at `http://localhost:8002` (or set `VITE_API_URL` in `frontend/.env`).
 
 ## Child DOX Index
 

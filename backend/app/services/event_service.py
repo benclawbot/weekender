@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 from typing import Optional
 import httpx
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, func
 from sqlalchemy.ext.asyncio import AsyncSession
 import uuid
 
@@ -62,13 +62,17 @@ class EventService:
         except ValueError:
             return []
 
+        # The window inputs are YYYY-MM-DD, treated as inclusive day-precision
+        # bounds. We compare day-precision too so a date_from with a non-zero
+        # time-of-day (e.g. seeded events at 21:28) still matches a window end
+        # at 00:00 of the same calendar date.
         query = (
             select(Activity)
             .where(
                 Activity.type == "event",
                 Activity.canton.in_(cantons),
-                Activity.date_from <= dt,
-                Activity.date_to >= df,
+                func.date(Activity.date_from) <= dt.date(),
+                func.date(Activity.date_to) >= df.date(),
             )
             .order_by(Activity.date_from.asc())
         )
