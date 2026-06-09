@@ -1,0 +1,47 @@
+# Python
+__pycache__/
+*.py[cod]
+.env
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+
+# Node
+node_modules/
+frontend/node_modules/
+*.log
+
+# Uploads
+uploads/
+*.png
+*.jpg
+*.webp
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+.docker/
+
+# Coverage
+.coverage
+htmlcov/
+
+# Byte-compiled
+*.pyc
+
+# SQLite (local dev)
+*.db
+weekendplanner.db
+
+# Build artifacts
+dist/
+bundle.js
