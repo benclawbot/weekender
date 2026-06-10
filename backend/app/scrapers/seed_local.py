@@ -1,21 +1,38 @@
 """
-Seed script: populate DB with 80 Swiss activities (16 per canton) + 20 events.
-No external API needed  uses realistic Swiss data.
+Seed script: populate the DB with 80 Swiss evergreen activities
+(16 per canton) for local development. No external API needed.
+
+Events are NOT seeded here any more — they come from the live
+myswiss_com.py scraper on demand. The auto-seed flow (in
+``app/main.py``) runs this once on first start when the activities
+table is empty.
+
+Each activity carries a Wikipedia-hosted ``photo_url`` (free, no key)
+so the swipe card shows a real image even before any live scraping
+runs. Activities with no Wikipedia coverage fall back to the tag emoji
+on the card. The list of resolved URLs lives next to this file as
+``wiki_photos.json``; you can refresh it by running a small one-off
+script that hits the Wikipedia REST summary API.
+
 Usage: python -m app.scrapers.seed_local
 """
 import asyncio
-import sys
+import json
 import os
+import sys
+import uuid
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 
 from app.database import AsyncSessionLocal
 from app.models.activity import Activity
-import uuid
-from datetime import datetime, timedelta
+from datetime import datetime
 
 
-# 80 evergreen activities across 5 cantons (16 each)
+# 80 evergreen activities across 5 cantons (16 each).
+# Each entry may include a ``wiki_key`` that maps into WIKI_PHOTOS below
+# to populate ``photo_url`` with a real Wikimedia Commons image. Activities
+# without a ``wiki_key`` will simply show the tag emoji on the card.
 ACTIVITIES = [
     # GE - Geneva (16)
     {"title": "Musee d'Art et d'Histoire", "type": "evergreen", "canton": "GE",
@@ -31,31 +48,38 @@ ACTIVITIES = [
      "address": "Route de Malagnou 1, 1208 Geneve", "lat": 46.2327, "lng": 6.1515,
      "tags": ["museum", "indoor", "family", "animals"], "duration_hint": "2-3h",
      "opening_hours": {"tue": "10:00", "wed": "10:00", "thu": "10:00", "fri": "10:00", "sat": "10:00", "sun": "10:00"},
-     "maps_url": "https://www.google.com/maps/search/?api=1&query=Route+de+Malagnou+1+Geneve"},
+     "maps_url": "https://www.google.com/maps/search/?api=1&query=Route+de+Malagnou+1+Geneve",
+     "wiki_key": "Musee d'Histoire Naturelle"},
     {"title": "Jardin Botanique de Geneve", "type": "evergreen", "canton": "GE",
      "address": "Chemin de la Tour 12-14, 1292 Chambesy", "lat": 46.2286, "lng": 6.1094,
      "tags": ["outdoor", "nature", "family", "free"], "duration_hint": "1-2h",
-     "maps_url": "https://www.google.com/maps/search/?api=1&query=Chemin+de+la+Tour+12+Chambesy"},
+     "maps_url": "https://www.google.com/maps/search/?api=1&query=Chemin+de+la+Tour+12+Chambesy",
+     "wiki_key": "Jardin Botanique de Geneve"},
     {"title": "Bateau de la CGN", "type": "evergreen", "canton": "GE",
      "address": "Quai du Mont-Blanc 17, 1201 Geneve", "lat": 46.2080, "lng": 6.1470,
      "tags": ["outdoor", "boat", "family", "lake"], "duration_hint": "2-4h",
-     "maps_url": "https://www.google.com/maps/search/?api=1&query=Quai+du+Mont-Blanc+17+Geneve"},
+     "maps_url": "https://www.google.com/maps/search/?api=1&query=Quai+du+Mont-Blanc+17+Geneve",
+     "wiki_key": "Bateau de la CGN"},
     {"title": "Chateau d'Hermance", "type": "evergreen", "canton": "GE",
      "address": "Chemin du Chateau-de-Budry 1, 1248 Hermance", "lat": 46.2528, "lng": 6.2431,
      "tags": ["castle", "history", "outdoor", "culture"], "duration_hint": "2-3h",
-     "maps_url": "https://www.google.com/maps/search/?api=1&query=Chemin+du+Chateau-de-Budry+Hermance"},
+     "maps_url": "https://www.google.com/maps/search/?api=1&query=Chemin+du+Chateau-de-Budry+Hermance",
+     "wiki_key": "Chateau d'Hermance"},
     {"title": "Palais des Nations", "type": "evergreen", "canton": "GE",
      "address": "Avenue de la Paix 14, 1211 Geneve", "lat": 46.2252, "lng": 6.1109,
      "tags": ["history", "culture", "indoor", "architecture"], "duration_hint": "1-2h",
-     "maps_url": "https://www.google.com/maps/search/?api=1&query=Avenue+de+la+Paix+14+Geneve"},
+     "maps_url": "https://www.google.com/maps/search/?api=1&query=Avenue+de+la+Paix+14+Geneve",
+     "wiki_key": "Palais des Nations"},
     {"title": "Cite de la Musique", "type": "evergreen", "canton": "GE",
      "address": "Place du Prieure 6, 1205 Geneve", "lat": 46.2355, "lng": 6.0552,
      "tags": ["indoor", "culture", "music", "family"], "duration_hint": "1-2h",
-     "maps_url": "https://www.google.com/maps/search/?api=1&query=Place+du+Prieure+6+Geneve"},
+     "maps_url": "https://www.google.com/maps/search/?api=1&query=Place+du+Prieure+6+Geneve",
+     "wiki_key": "Cite de la Musique"},
     {"title": "Espace Aquarium", "type": "evergreen", "canton": "GE",
      "address": "Chemin du Chateau-de-Budry, 1248 Hermance", "lat": 46.2530, "lng": 6.2420,
      "tags": ["aquarium", "indoor", "family", "animals"], "duration_hint": "2-3h",
-     "maps_url": "https://www.google.com/maps/search/?api=1&query=Aquarium+Hermance"},
+     "maps_url": "https://www.google.com/maps/search/?api=1&query=Aquarium+Hermance",
+     "wiki_key": "Espace Aquarium"},
     {"title": "Base de sports de La Pierre", "type": "evergreen", "canton": "GE",
      "address": "Route de La Pierre, 1256 Troinex", "lat": 46.2435, "lng": 6.1195,
      "tags": ["outdoor", "sports", "family", "water"], "duration_hint": "2-4h",
@@ -79,49 +103,60 @@ ACTIVITIES = [
     {"title": "Ferney-Voltaire (France)", "type": "evergreen", "canton": "GE",
      "address": "Avenue du Jura, 01210 Ferney-Voltaire, France", "lat": 46.2581, "lng": 6.1086,
      "tags": ["outdoor", "culture", "castle", "history"], "duration_hint": "2-3h",
-     "maps_url": "https://www.google.com/maps/search/?api=1&query=Ferney-Voltaire+France"},
+     "maps_url": "https://www.google.com/maps/search/?api=1&query=Ferney-Voltaire+France",
+     "wiki_key": "Ferney-Voltaire (France)"},
     {"title": "Conservatoire et Jardin Botaniques", "type": "evergreen", "canton": "GE",
      "address": "Chemin de la Tour 2, 1292 Chambesy", "lat": 46.2290, "lng": 6.1100,
      "tags": ["outdoor", "botanical_garden", "nature", "family"], "duration_hint": "1-2h",
-     "maps_url": "https://www.google.com/maps/search/?api=1&query=Conservatoire+Chambesy"},
+     "maps_url": "https://www.google.com/maps/search/?api=1&query=Conservatoire+Chambesy",
+     "wiki_key": "Conservatoire et Jardin Botaniques"},
+
     # VD - Vaud (16)
     {"title": "Aquatis Aquarium-Vivarium", "type": "evergreen", "canton": "VD",
      "address": "Route de Lausanne 1, 1030 Bussigny", "lat": 46.5560, "lng": 6.5690,
      "tags": ["aquarium", "indoor", "family", "animals"], "duration_hint": "2-3h",
      "opening_hours": {"tue": "09:00", "wed": "09:00", "thu": "09:00", "fri": "09:00", "sat": "09:00", "sun": "09:00"},
-     "maps_url": "https://www.google.com/maps/search/?api=1&query=Aquatis+Bussigny"},
+     "maps_url": "https://www.google.com/maps/search/?api=1&query=Aquatis+Bussigny",
+     "wiki_key": "Aquatis Aquarium-Vivarium"},
     {"title": "Olympique de Lausanne Museum", "type": "evergreen", "canton": "VD",
      "address": "Quai d'Ouchy 1, 1006 Lausanne", "lat": 46.5165, "lng": 6.6278,
      "tags": ["museum", "indoor", "culture", "sports"], "duration_hint": "2-3h",
      "opening_hours": {"tue": "09:00", "wed": "09:00", "thu": "09:00", "fri": "09:00", "sat": "09:00", "sun": "09:00"},
-     "maps_url": "https://www.google.com/maps/search/?api=1&query=Quai+d'Ouchy+1+Lausanne"},
+     "maps_url": "https://www.google.com/maps/search/?api=1&query=Quai+d'Ouchy+1+Lausanne",
+     "wiki_key": "Olympique de Lausanne Museum"},
     {"title": "Leman Express", "type": "evergreen", "canton": "VD",
      "address": "Place de la Gare 6, 1003 Lausanne", "lat": 46.5169, "lng": 6.6294,
      "tags": ["outdoor", "train", "family", "scenic"], "duration_hint": "1-2h",
-     "maps_url": "https://www.google.com/maps/search/?api=1&query=Gare+de+Lausanne"},
+     "maps_url": "https://www.google.com/maps/search/?api=1&query=Gare+de+Lausanne",
+     "wiki_key": "Leman Express"},
     {"title": "Parc de la Vuachere", "type": "evergreen", "canton": "VD",
      "address": "Chemin du Parc de la Vuachere, 1008 Prilly", "lat": 46.5290, "lng": 6.6180,
      "tags": ["outdoor", "nature", "family", "free"], "duration_hint": "1-2h",
-     "maps_url": "https://www.google.com/maps/search/?api=1&query=Parc+de+la+Vuachere+Prilly"},
+     "maps_url": "https://www.google.com/maps/search/?api=1&query=Parc+de+la+Vuachere+Prilly",
+     "wiki_key": "Parc de la Vuachere"},
     {"title": "Caves de Montreux", "type": "evergreen", "canton": "VD",
      "address": "Grand-Rue 82, 1820 Montreux", "lat": 46.4311, "lng": 6.9108,
      "tags": ["indoor", "wine", "culture", "paid"], "duration_hint": "1-2h",
      "opening_hours": {"tue": "10:00", "wed": "10:00", "thu": "10:00", "fri": "10:00", "sat": "10:00"},
-     "maps_url": "https://www.google.com/maps/search/?api=1&query=Grand-Rue+82+Montreux"},
+     "maps_url": "https://www.google.com/maps/search/?api=1&query=Grand-Rue+82+Montreux",
+     "wiki_key": "Caves de Montreux"},
     {"title": "Chateau de Chillon", "type": "evergreen", "canton": "VD",
      "address": "Avenue de Chillon 21, 1820 Veytaux", "lat": 46.4142, "lng": 6.8940,
      "tags": ["castle", "history", "outdoor", "culture"], "duration_hint": "2-3h",
      "opening_hours": {"tue": "09:00", "wed": "09:00", "thu": "09:00", "fri": "09:00", "sat": "09:00", "sun": "09:00"},
-     "maps_url": "https://www.google.com/maps/search/?api=1&query=Chateau+de+Chillon+Veytaux"},
+     "maps_url": "https://www.google.com/maps/search/?api=1&query=Chateau+de+Chillon+Veytaux",
+     "wiki_key": "Chateau de Chillon"},
     {"title": "Lavaux, Vignobles en Terrasses", "type": "evergreen", "canton": "VD",
      "address": "Route du Vin 1, 1096 Cully", "lat": 46.4839, "lng": 6.7449,
      "tags": ["outdoor", "wine", "nature", "family"], "duration_hint": "3-4h",
-     "maps_url": "https://www.google.com/maps/search/?api=1&query=Route+du+Vin+Cully"},
+     "maps_url": "https://www.google.com/maps/search/?api=1&query=Route+du+Vin+Cully",
+     "wiki_key": "Lavaux, Vignobles en Terrasses"},
     {"title": "Fondation de l'Hermitage", "type": "evergreen", "canton": "VD",
      "address": "Route du Signal 2, 1008 Prilly", "lat": 46.5312, "lng": 6.6132,
      "tags": ["museum", "indoor", "culture", "art"], "duration_hint": "2-3h",
      "opening_hours": {"tue": "10:00", "wed": "10:00", "thu": "10:00", "fri": "10:00", "sat": "10:00", "sun": "10:00"},
-     "maps_url": "https://www.google.com/maps/search/?api=1&query=Route+du+Signal+2+Prilly"},
+     "maps_url": "https://www.google.com/maps/search/?api=1&query=Route+du+Signal+2+Prilly",
+     "wiki_key": "Fondation de l'Hermitage"},
     {"title": "Ecole de Cirque de Lausanne", "type": "evergreen", "canton": "VD",
      "address": "Chemin du Levant 143, 1000 Lausanne 13", "lat": 46.5450, "lng": 6.6200,
      "tags": ["indoor", "family", "circus", "sports"], "duration_hint": "1-2h",
@@ -133,11 +168,13 @@ ACTIVITIES = [
     {"title": "Vieux-Port de Lausanne", "type": "evergreen", "canton": "VD",
      "address": "Place de la Navigation, 1006 Lausanne", "lat": 46.5090, "lng": 6.6310,
      "tags": ["outdoor", "lake", "family", "boat"], "duration_hint": "1-2h",
-     "maps_url": "https://www.google.com/maps/search/?api=1&query=Place+de+la+Navigation+Lausanne"},
+     "maps_url": "https://www.google.com/maps/search/?api=1&query=Place+de+la+Navigation+Lausanne",
+     "wiki_key": "Vieux-Port de Lausanne"},
     {"title": "Parc de Milan", "type": "evergreen", "canton": "VD",
      "address": "Avenue de la Vallonniere 5, 1012 Lausanne", "lat": 46.5270, "lng": 6.6250,
      "tags": ["outdoor", "nature", "family", "free"], "duration_hint": "1-2h",
-     "maps_url": "https://www.google.com/maps/search/?api=1&query=Avenue+de+la+Vallonniere+Lausanne"},
+     "maps_url": "https://www.google.com/maps/search/?api=1&query=Avenue+de+la+Vallonniere+Lausanne",
+     "wiki_key": "Parc de Milan"},
     {"title": "Cite de l'Eau", "type": "evergreen", "canton": "VD",
      "address": "Chemin du Viaduc 14, 1008 Prilly", "lat": 46.5340, "lng": 6.6160,
      "tags": ["indoor", "aquatic", "family", "sports"], "duration_hint": "2-3h",
@@ -154,6 +191,7 @@ ACTIVITIES = [
      "address": "Chemin du Boise 1, 1076 Preverenges", "lat": 46.5045, "lng": 6.5688,
      "tags": ["outdoor", "water", "sports", "family"], "duration_hint": "2-4h",
      "maps_url": "https://www.google.com/maps/search/?api=1&query=Base+de+voile+Preverenges"},
+
     # FR - Fribourg (16)
     {"title": "Musee d'Art de Fribourg", "type": "evergreen", "canton": "FR",
      "address": "Route de Morat 12, 1700 Fribourg", "lat": 46.8000, "lng": 7.1500,
@@ -164,7 +202,8 @@ ACTIVITIES = [
      "address": "Kornhausplatz 1, 3011 Bern", "lat": 46.9481, "lng": 7.4478,
      "tags": ["history", "culture", "indoor", "architecture"], "duration_hint": "1h",
      "opening_hours": {"tue": "10:00", "wed": "10:00", "thu": "10:00", "fri": "10:00", "sat": "10:00", "sun": "10:00"},
-     "maps_url": "https://www.google.com/maps/search/?api=1&query=Kornhausplatz+1+Bern"},
+     "maps_url": "https://www.google.com/maps/search/?api=1&query=Kornhausplatz+1+Bern",
+     "wiki_key": "Zytglogge (Clock Tower)"},
     {"title": "Espace Francois Mitterrand", "type": "evergreen", "canton": "FR",
      "address": "Le Plaza, 1763 Granges-Paccot", "lat": 46.8220, "lng": 7.1710,
      "tags": ["indoor", "culture", "library", "family"], "duration_hint": "1-2h",
@@ -176,12 +215,14 @@ ACTIVITIES = [
     {"title": "Gruyeres Village", "type": "evergreen", "canton": "FR",
      "address": "Rue du Bourg 1, 1663 Gruyeres", "lat": 46.5808, "lng": 7.0833,
      "tags": ["outdoor", "culture", "castle", "family"], "duration_hint": "2-3h",
-     "maps_url": "https://www.google.com/maps/search/?api=1&query=Rue+du+Bourg+1+Gruyeres"},
+     "maps_url": "https://www.google.com/maps/search/?api=1&query=Rue+du+Bourg+1+Gruyeres",
+     "wiki_key": "Gruyeres Village"},
     {"title": "Maison du Gruyere", "type": "evergreen", "canton": "FR",
      "address": "Route du Gruyeres 9, 1633 Pringy", "lat": 46.5833, "lng": 7.0689,
      "tags": ["indoor", "food", "family", "paid"], "duration_hint": "1-2h",
      "opening_hours": {"tue": "09:00", "wed": "09:00", "thu": "09:00", "fri": "09:00", "sat": "09:00", "sun": "09:00"},
-     "maps_url": "https://www.google.com/maps/search/?api=1&query=Route+du+Gruyeres+9+Pringy"},
+     "maps_url": "https://www.google.com/maps/search/?api=1&query=Route+du+Gruyeres+9+Pringy",
+     "wiki_key": "Maison du Gruyere"},
     {"title": "Fromagerie d'Allewil", "type": "evergreen", "canton": "FR",
      "address": "Chemin de Allewil 1, 1724 Ferpicoulaz", "lat": 46.7730, "lng": 7.0980,
      "tags": ["indoor", "food", "family", "cheese"], "duration_hint": "1h",
@@ -201,7 +242,8 @@ ACTIVITIES = [
     {"title": "Schwarzsee Lake", "type": "evergreen", "canton": "FR",
      "address": "Schwarzsee, 1716 Schwarzsee", "lat": 46.6930, "lng": 7.2310,
      "tags": ["outdoor", "nature", "lake", "family"], "duration_hint": "2-3h",
-     "maps_url": "https://www.google.com/maps/search/?api=1&query=Schwarzsee+Fribourg"},
+     "maps_url": "https://www.google.com/maps/search/?api=1&query=Schwarzsee+Fribourg",
+     "wiki_key": "Schwarzsee Lake"},
     {"title": "Taifferenloch", "type": "evergreen", "canton": "FR",
      "address": "Taifferenloch, 1716 Schwarzsee", "lat": 46.6890, "lng": 7.2400,
      "tags": ["outdoor", "nature", "hiking", "water"], "duration_hint": "1-2h",
@@ -213,7 +255,8 @@ ACTIVITIES = [
     {"title": "Broc Village Creamery", "type": "evergreen", "canton": "FR",
      "address": "Rue de la Maison-de-Resonance 1, 1635 La Tour-de-Treme", "lat": 46.5730, "lng": 7.0550,
      "tags": ["indoor", "food", "chocolate", "family"], "duration_hint": "1-2h",
-     "maps_url": "https://www.google.com/maps/search/?api=1&query=Maison+de+Resonance+La+Tour-de-Treme"},
+     "maps_url": "https://www.google.com/maps/search/?api=1&query=Maison+de+Resonance+La+Tour-de-Treme",
+     "wiki_key": "Broc Village Creamery"},
     {"title": "Parc du Botanique", "type": "evergreen", "canton": "FR",
      "address": "Avenue du Botanique 12, 1700 Fribourg", "lat": 46.7880, "lng": 7.1580,
      "tags": ["outdoor", "nature", "family", "free"], "duration_hint": "1-2h",
@@ -221,13 +264,16 @@ ACTIVITIES = [
     {"title": "Gorges de la Jogne", "type": "evergreen", "canton": "FR",
      "address": "Gorges de la Jogne, 1635 La Roche", "lat": 46.6170, "lng": 7.0980,
      "tags": ["outdoor", "nature", "hiking", "scenic"], "duration_hint": "2-3h",
-     "maps_url": "https://www.google.com/maps/search/?api=1&query=Gorges+de+la+Jogne+La+Roche"},
+     "maps_url": "https://www.google.com/maps/search/?api=1&query=Gorges+de+la+Jogne+La+Roche",
+     "wiki_key": "Gorges de la Jogne"},
+
     # VS - Valais (16)
     {"title": "Matterhorn Museum", "type": "evergreen", "canton": "VS",
      "address": "Bahnhofstrasse 55, 3920 Zermatt", "lat": 46.0207, "lng": 7.7490,
      "tags": ["museum", "indoor", "culture", "history"], "duration_hint": "1-2h",
      "opening_hours": {"tue": "10:00", "wed": "10:00", "thu": "10:00", "fri": "10:00", "sat": "10:00", "sun": "10:00"},
-     "maps_url": "https://www.google.com/maps/search/?api=1&query=Bahnhofstrasse+55+Zermatt"},
+     "maps_url": "https://www.google.com/maps/search/?api=1&query=Bahnhofstrasse+55+Zermatt",
+     "wiki_key": "Matterhorn Museum"},
     {"title": "Gorner Gorge", "type": "evergreen", "canton": "VS",
      "address": "Gorges du Gorner, 3920 Zermatt", "lat": 46.0160, "lng": 7.7440,
      "tags": ["outdoor", "nature", "hiking", "scenic"], "duration_hint": "1-2h",
@@ -239,7 +285,8 @@ ACTIVITIES = [
     {"title": "Mont Fort", "type": "evergreen", "canton": "VS",
      "address": "Mont Fort, 1991 Nendaz", "lat": 46.1830, "lng": 7.3050,
      "tags": ["outdoor", "mountain", "ski", "paid"], "duration_hint": "3-4h",
-     "maps_url": "https://www.google.com/maps/search/?api=1&query=Mont+Fort+Nendaz"},
+     "maps_url": "https://www.google.com/maps/search/?api=1&query=Mont+Fort+Nendaz",
+     "wiki_key": "Mont Fort"},
     {"title": "Trift Bridge", "type": "evergreen", "canton": "VS",
      "address": "Trift, 3987 Riederalp", "lat": 46.3260, "lng": 8.0330,
      "tags": ["outdoor", "hiking", "nature", "scenic"], "duration_hint": "2-3h",
@@ -252,7 +299,8 @@ ACTIVITIES = [
     {"title": "Leukerbad Thermal Baths", "type": "evergreen", "canton": "VS",
      "address": "Dorfplatz 1, 3954 Leukerbad", "lat": 46.3160, "lng": 7.6930,
      "tags": ["indoor", "spa", "family", "paid"], "duration_hint": "2-3h",
-     "maps_url": "https://www.google.com/maps/search/?api=1&query=Dorfplatz+1+Leukerbad"},
+     "maps_url": "https://www.google.com/maps/search/?api=1&query=Dorfplatz+1+Leukerbad",
+     "wiki_key": "Leukerbad Thermal Baths"},
     {"title": "Fun Park Champery", "type": "evergreen", "canton": "VS",
      "address": "Le Plan de l'Are, 1874 Champery", "lat": 46.1040, "lng": 6.8690,
      "tags": ["outdoor", "family", "adventure", "paid"], "duration_hint": "3-4h",
@@ -284,11 +332,13 @@ ACTIVITIES = [
     {"title": "Bisse du Rhone", "type": "evergreen", "canton": "VS",
      "address": "Bisse du Rhone, 1991 Nendaz", "lat": 46.1930, "lng": 7.2830,
      "tags": ["outdoor", "nature", "hiking", "family"], "duration_hint": "2-3h",
-     "maps_url": "https://www.google.com/maps/search/?api=1&query=Bisse+du+Rhone+Nendaz"},
+     "maps_url": "https://www.google.com/maps/search/?api=1&query=Bisse+du+Rhone+Nendaz",
+     "wiki_key": "Bisse du Rhone"},
     {"title": "Gorges de la Lizerne", "type": "evergreen", "canton": "VS",
      "address": "Lesotta, 1982 Evionnaz", "lat": 46.1450, "lng": 7.1950,
      "tags": ["outdoor", "nature", "hiking", "water"], "duration_hint": "2-3h",
      "maps_url": "https://www.google.com/maps/search/?api=1&query=Lesotta+Canyon+Eviou"},
+
     # JU - Jura (16)
     {"title": "Musee de la machine a ecrire", "type": "evergreen", "canton": "JU",
      "address": "Le Conventus, 2822 Courroux", "lat": 47.3660, "lng": 7.3470,
@@ -335,11 +385,13 @@ ACTIVITIES = [
     {"title": "Le Brassus Heritage", "type": "evergreen", "canton": "JU",
      "address": "Le Brassus, 1348 Le Chenit", "lat": 46.5870, "lng": 6.1680,
      "tags": ["indoor", "culture", "watchmaking", "history"], "duration_hint": "1-2h",
-     "maps_url": "https://www.google.com/maps/search/?api=1&query=Le+Brassus+Le+Chenit"},
+     "maps_url": "https://www.google.com/maps/search/?api=1&query=Le+Brassus+Le+Chenit",
+     "wiki_key": "Le Brassus Heritage"},
     {"title": "Creux du Van", "type": "evergreen", "canton": "JU",
      "address": "Creux du Van, 2127 Montalvannes", "lat": 47.0880, "lng": 6.7380,
      "tags": ["outdoor", "nature", "hiking", "scenic"], "duration_hint": "3-4h",
-     "maps_url": "https://www.google.com/maps/search/?api=1&query=Creux+du+Van+Montalvannes"},
+     "maps_url": "https://www.google.com/maps/search/?api=1&query=Creux+du+Van+Montalvannes",
+     "wiki_key": "Creux du Van"},
     {"title": "Sentier des Reliefs", "type": "evergreen", "canton": "JU",
      "address": "Le Noirmont, 2710 Tavannes", "lat": 47.2380, "lng": 7.0250,
      "tags": ["outdoor", "nature", "hiking", "family"], "duration_hint": "2-3h",
@@ -355,114 +407,45 @@ ACTIVITIES = [
     {"title": "Aiguilles de Baulmes", "type": "evergreen", "canton": "JU",
      "address": "Aiguilles de Baulmes, 1048 Baulmes", "lat": 46.7890, "lng": 6.5090,
      "tags": ["outdoor", "nature", "hiking", "scenic"], "duration_hint": "3-4h",
-     "maps_url": "https://www.google.com/maps/search/?api=1&query=Aiguilles+de+Baulmes"},
+     "maps_url": "https://www.google.com/maps/search/?api=1&query=Aiguilles+de+Baulmes",
+     "wiki_key": "Aiguilles de Baulmes"},
 ]
 
-# 20 events across cantons
-today = datetime.utcnow()
-friday = today + timedelta(days=(4 - today.weekday()) % 7)
-sat = friday + timedelta(days=1)
-sun = friday + timedelta(days=2)
-
-EVENTS = [
-    # GE events (Geneve)
-    {"title": "Fete de la Nature au Parc des Bastions", "type": "event", "canton": "GE",
-     "date_from": sat, "date_to": sun, "address": "Parc des Bastions, Geneve",
-     "lat": 46.2333, "lng": 6.0494, "tags": ["event", "family", "nature"],
-     "duration_hint": "4h", "source_url": "https://www.agenda.ch/fr/evenements/?q=Fete+de+la+Nature&region=geneve"},
-    {"title": "Marche des Producteurs a Rive", "type": "event", "canton": "GE",
-     "date_from": sat, "date_to": sat, "address": "Rue de Rive, Geneve",
-     "lat": 46.2044, "lng": 6.1490, "tags": ["event", "family", "food"],
-     "duration_hint": "3h", "source_url": "https://www.agenda.ch/fr/evenements/?q=Marche+Producteurs&region=geneve"},
-    {"title": "Concert en Plein Air", "type": "event", "canton": "GE",
-     "date_from": sat, "date_to": sat, "address": "Esplanade du Lac, Geneve",
-     "lat": 46.2080, "lng": 6.1470, "tags": ["event", "music", "family"],
-     "duration_hint": "2h", "source_url": "https://www.agenda.ch/fr/evenements/?q=Concert+Plein+Air&region=geneve"},
-    {"title": "Exposition d'Art pour Enfants", "type": "event", "canton": "GE",
-     "date_from": friday, "date_to": sun, "address": "Museum d'Histoire Naturelle, Geneve",
-     "lat": 46.2327, "lng": 6.1515, "tags": ["event", "family", "culture"],
-     "duration_hint": "3h", "source_url": "https://www.agenda.ch/fr/evenements/?q=Exposition+Enfants&region=geneve"},
-    # VD events (Vaud)
-    {"title": "Fete du Vin de Lavaux", "type": "event", "canton": "VD",
-     "date_from": sat, "date_to": sun, "address": "Lavaux, Vignobles, Cully",
-     "lat": 46.4839, "lng": 6.7449, "tags": ["event", "wine", "family"],
-     "duration_hint": "5h", "source_url": "https://www.agenda.ch/fr/evenements/?q=Fete+Vin+Lavaux&region=vaud"},
-    {"title": "Marche des Producteurs a Lausanne", "type": "event", "canton": "VD",
-     "date_from": sat, "date_to": sat, "address": "Place de la Gare, Lausanne",
-     "lat": 46.5169, "lng": 6.6294, "tags": ["event", "food", "family"],
-     "duration_hint": "3h", "source_url": "https://www.agenda.ch/fr/evenements/?q=Marche+Producteurs&region=vaud"},
-    {"title": "Festival de Blues a Montreux", "type": "event", "canton": "VD",
-     "date_from": friday, "date_to": sun, "address": "Quais de Montreux",
-     "lat": 46.4311, "lng": 6.9108, "tags": ["event", "music", "family"],
-     "duration_hint": "6h", "source_url": "https://www.agenda.ch/fr/evenements/?q=Festival+Blues+Montreux&region=vaud"},
-    {"title": "Regate de Bateaux sur le Lac", "type": "event", "canton": "VD",
-     "date_from": sat, "date_to": sat, "address": "Plage de Vidy, Lausanne",
-     "lat": 46.5090, "lng": 6.6080, "tags": ["event", "sports", "lake"],
-     "duration_hint": "4h", "source_url": "https://www.agenda.ch/fr/evenements/?q=Regate+Bateaux&region=vaud"},
-    # FR events (Fribourg)
-    {"title": "Fete du Gruyeres", "type": "event", "canton": "FR",
-     "date_from": sat, "date_to": sun, "address": "Place du Village, Gruyeres",
-     "lat": 46.5808, "lng": 7.0833, "tags": ["event", "food", "family"],
-     "duration_hint": "5h", "source_url": "https://www.agenda.ch/fr/evenements/?q=Fete+Gruyere&region=fribourg"},
-    {"title": "Marche Medieval de Fribourg", "type": "event", "canton": "FR",
-     "date_from": sat, "date_to": sat, "address": "Vieille Ville, Fribourg",
-     "lat": 46.8020, "lng": 7.1610, "tags": ["event", "history", "family"],
-     "duration_hint": "4h", "source_url": "https://www.agenda.ch/fr/evenements/?q=Marche+Medieval&region=fribourg"},
-    {"title": "Concours des Fromages", "type": "event", "canton": "FR",
-     "date_from": sat, "date_to": sat, "address": "Marche de la Sarine, Fribourg",
-     "lat": 46.7980, "lng": 7.1580, "tags": ["event", "food", "family"],
-     "duration_hint": "3h", "source_url": "https://www.agenda.ch/fr/evenements/?q=Concours+Fromages&region=fribourg"},
-    {"title": "Course de Velos au Lac", "type": "event", "canton": "FR",
-     "date_from": sun, "date_to": sun, "address": "Lac de Perolles, Fribourg",
-     "lat": 46.7950, "lng": 7.1610, "tags": ["event", "sports", "family"],
-     "duration_hint": "4h", "source_url": "https://www.agenda.ch/fr/evenements/?q=Course+Velos&region=fribourg"},
-    # VS events (Valais)
-    {"title": "Festival de Musique Alpine", "type": "event", "canton": "VS",
-     "date_from": friday, "date_to": sun, "address": "Village de Zermatt",
-     "lat": 46.0207, "lng": 7.7490, "tags": ["event", "music", "mountain"],
-     "duration_hint": "6h", "source_url": "https://www.agenda.ch/fr/evenements/?q=Festival+Musique+Alpine&region=valais"},
-    {"title": "Fete du Vin du Valais", "type": "event", "canton": "VS",
-     "date_from": sat, "date_to": sun, "address": "Vieille Ville de Sion",
-     "lat": 46.2330, "lng": 7.3600, "tags": ["event", "wine", "family"],
-     "duration_hint": "5h", "source_url": "https://www.agenda.ch/fr/evenements/?q=Fete+Vin+Valais&region=valais"},
-    {"title": "Montee du Rhone", "type": "event", "canton": "VS",
-     "date_from": sat, "date_to": sat, "address": "Martigny",
-     "lat": 46.1000, "lng": 7.0700, "tags": ["event", "sports", "family"],
-     "duration_hint": "4h", "source_url": "https://www.agenda.ch/fr/evenements/?q=Montee+du+Rhone&region=valais"},
-    {"title": "Fete du Chocolat", "type": "event", "canton": "VS",
-     "date_from": sat, "date_to": sun, "address": "Le Bouveret",
-     "lat": 46.3870, "lng": 6.8560, "tags": ["event", "food", "family"],
-     "duration_hint": "5h", "source_url": "https://www.agenda.ch/fr/evenements/?q=Fete+Chocolat&region=valais"},
-    # JU events (Jura)
-    {"title": "Fete de l'Ecole", "type": "event", "canton": "JU",
-     "date_from": sat, "date_to": sat, "address": "Parc de la Jurisdiction, Porrentruy",
-     "lat": 47.4160, "lng": 7.0750, "tags": ["event", "family", "free"],
-     "duration_hint": "4h", "source_url": "https://www.agenda.ch/fr/evenements/?q=Fete+Ecole&region=jura"},
-    {"title": "Marche Artisanal", "type": "event", "canton": "JU",
-     "date_from": sat, "date_to": sat, "address": "Centre Ville, Delemont",
-     "lat": 47.3650, "lng": 7.3430, "tags": ["event", "handmade", "family"],
-     "duration_hint": "3h", "source_url": "https://www.agenda.ch/fr/evenements/?q=Marche+Artisanal&region=jura"},
-    {"title": "Festival de la Transhumance", "type": "event", "canton": "JU",
-     "date_from": sat, "date_to": sun, "address": "Franches-Montagnes",
-     "lat": 47.2280, "lng": 7.0700, "tags": ["event", "nature", "family"],
-     "duration_hint": "5h", "source_url": "https://www.agenda.ch/fr/evenements/?q=Transhumance&region=jura"},
-    {"title": "Jazz sous les Chataigniers", "type": "event", "canton": "JU",
-     "date_from": friday, "date_to": sat, "address": "Saignelegier",
-     "lat": 47.2560, "lng": 7.0050, "tags": ["event", "music", "family"],
-     "duration_hint": "4h", "source_url": "https://www.agenda.ch/fr/evenements/?q=Jazz+Chataigniers&region=jura"},
-]
+WIKI_PHOTOS_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+    "wiki_photos.json",
+)
 
 
-async def seed():
+def _load_wiki_photos() -> dict[str, str]:
+    if not os.path.exists(WIKI_PHOTOS_PATH):
+        return {}
+    try:
+        with open(WIKI_PHOTOS_PATH, encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {}
+
+
+async def seed() -> int:
+    """Wipe and re-seed the activities table with the local dataset.
+
+    Returns the number of activities inserted.
+    """
+    from sqlalchemy import delete
+
+    wiki = _load_wiki_photos()
+    print(f"[seed] loaded {len(wiki)} Wikipedia photo URLs")
+
     async with AsyncSessionLocal() as db:
-        # Clear existing
-        from sqlalchemy import delete
         await db.execute(delete(Activity))
         await db.commit()
         print("[seed] Cleared existing activities")
 
         count = 0
-        for data in ACTIVITIES + EVENTS:
+        for data in ACTIVITIES:
+            wiki_key = data.pop("wiki_key", None)
+            photo_url = wiki.get(f"{data['canton']}::{wiki_key}") if wiki_key else None
             activity = Activity(
                 id=str(uuid.uuid4()),
                 google_place_id=data.get("google_place_id"),
@@ -474,6 +457,7 @@ async def seed():
                 lng=data.get("lng"),
                 opening_hours=data.get("opening_hours"),
                 photo_path=data.get("photo_path"),
+                photo_url=photo_url,
                 maps_url=data.get("maps_url"),
                 website=data.get("website"),
                 tags=data.get("tags", []),
@@ -488,7 +472,8 @@ async def seed():
             count += 1
 
         await db.commit()
-        print(f"[seed] Done. {count} activities inserted ({len(ACTIVITIES)} evergreen + {len(EVENTS)} events)")
+        print(f"[seed] Done. {count} evergreen activities inserted")
+        return count
 
 
 if __name__ == "__main__":

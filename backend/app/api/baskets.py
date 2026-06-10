@@ -9,6 +9,7 @@ from sqlalchemy.orm import selectinload
 from app.database import get_db
 from app.models.activity import Basket, BasketActivity, Activity
 from app.schemas import BasketCreate, BasketResponse, BasketActivitySchema
+from app.services.activity_service import ActivityService
 
 router = APIRouter()
 
@@ -64,7 +65,7 @@ async def create_basket(
     result = await db.execute(query)
     basket = result.scalar_one()
 
-    return _basket_to_response(basket)
+    return _basket_to_response(basket, ActivityService(db))
 
 
 @router.get("/baskets/{basket_id}")
@@ -83,7 +84,7 @@ async def get_basket(
     if not basket:
         raise HTTPException(status_code=404, detail="Basket not found")
 
-    return _basket_to_response(basket)
+    return _basket_to_response(basket, ActivityService(db))
 
 
 @router.delete("/baskets/{basket_id}")
@@ -122,7 +123,10 @@ async def remove_activity_from_basket(
     return {"ok": True}
 
 
-def _basket_to_response(basket: Basket) -> dict:
+def _basket_to_response(basket: Basket, activity_service: ActivityService | None = None) -> dict:
+    # activity_service may be None when called without it (e.g. from list_baskets
+    # where we don't want to create a service per basket). Provide a default path.
+    _svc = activity_service or _DummyActivityService()
     return {
         "id": basket.id,
         "session_id": basket.session_id,
@@ -138,7 +142,7 @@ def _basket_to_response(basket: Basket) -> dict:
                 "address": ba.activity.address,
                 "lat": ba.activity.lat,
                 "lng": ba.activity.lng,
-                "photo_url": f"/uploads/photos/{ba.activity.photo_path}" if ba.activity.photo_path else None,
+                "photo_url": _svc.photo_url_for(ba.activity),
                 "maps_url": ba.activity.maps_url,
                 "website": ba.activity.website,
                 "tags": ba.activity.tags or [],
@@ -150,3 +154,14 @@ def _basket_to_response(basket: Basket) -> dict:
             for ba in basket.activities
         ],
     }
+
+
+class _DummyActivityService:
+    """Fallback when ActivityService isn't available (e.g. list_baskets)."""
+
+    def photo_url_for(self, activity: Activity) -> str | None:
+        if activity.photo_url:
+            return activity.photo_url
+        if activity.photo_path:
+            return f"/uploads/photos/{activity.photo_path}"
+        return None

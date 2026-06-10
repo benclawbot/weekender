@@ -63,10 +63,9 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Static files for uploaded photos
-uploads_path = os.path.join(os.path.dirname(__file__), "..", "uploads")
-if os.path.exists(uploads_path):
-    app.mount("/uploads", StaticFiles(directory=uploads_path), name="uploads")
+# Static files for uploaded photos served at /uploads/photos/...
+# The photos_dir setting (uploads/photos) is relative to the backend root.
+app.mount("/uploads", StaticFiles(directory=settings.static_uploads_dir), name="uploads")
 
 # CORS
 cors_origins = ["http://localhost:5173"] if settings.environment == "development" else []

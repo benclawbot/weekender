@@ -37,7 +37,7 @@
 }
 ```
 
-`vite-plugin-pwa` config: `registerType: 'autoUpdate'`, cache all static assets and API responses for `/activities` (stale-while-revalidate, 24h).
+`vite-plugin-pwa` config: `registerType: 'autoUpdate'`, cache static assets and API responses for `/activities` (stale-while-revalidate, 24h).
 
 The app must be installable on iOS Safari and Android Chrome. Test with Lighthouse PWA audit.
 
@@ -59,33 +59,37 @@ export function getSessionId(): string {
 
 ---
 
-## Global state (Zustand)
+## Global state (Zustand, persisted to localStorage)
 
 ```typescript
 // src/store.ts
+type DeckMode = 'events' | 'evergreen' | 'both';
+
 interface AppStore {
   // Setup
   dateFrom: string;           // "YYYY-MM-DD"
   dateTo: string;
-  activeCantons: string[];    // ["GE","VD","FR","VS","JU"]
+  activeCantons: Canton[];    // ["GE","VD","FR","VS","JU"]
+  deckMode: DeckMode;         // default: 'events'
 
   // Swipe session
-  deck: Activity[];           // merged activities + events, sorted by pref
+  deck: Activity[];           // merged activities + events
   deckIndex: number;
-  currentBasket: Activity[];  // activities swiped up this session
-
-  // Prefs (local mirror of DB)
-  prefs: Record<string, number>; // activity_id → score
+  currentBasket: Activity[];  // activities swiped up/right this session
 
   // Actions
   setDates(from: string, to: string): void;
-  toggleCanton(id: string): void;
+  toggleCanton(id: Canton): void;
+  setDeckMode(mode: DeckMode): void;
   setDeck(items: Activity[]): void;
   swipe(direction: 'yes' | 'up' | 'no'): void;
+  addToBasket(activity: Activity): void;   // no-op if already present
   removeFromBasket(id: string): void;
   resetSession(): void;
 }
 ```
+
+The `persist` middleware stores `dateFrom`, `dateTo`, `activeCantons`, `deckMode`, and `currentBasket`. The `deck` and `deckIndex` are intentionally **not** persisted (they come from the API on each session load).
 
 ---
 
@@ -98,7 +102,7 @@ interface AppStore {
 /basket/:id      → BasketDetailPage (archived basket view)
 ```
 
-Use `<Navigate>` to redirect `/` → `/swipe` if dateFrom is already set.
+Use `<Navigate>` to redirect `/` → `/swipe` if a non-empty `deck` is in the store.
 
 ---
 
@@ -106,24 +110,26 @@ Use `<Navigate>` to redirect `/` → `/swipe` if dateFrom is already set.
 
 ### SetupPage (`/`)
 
-**Purpose:** pick weekend dates + canton filter, then navigate to swipe deck.
+**Purpose:** pick weekend dates + canton filter + deck mode, then navigate to swipe deck.
 
 **Layout (mobile):**
 ```
-[Header: "Plan your weekend" + subtitle canton list]
+[Header: "Plan your weekend" + tagline]
 [Date row: From | To]  ← two date inputs side by side
 [Section label: "Cantons"]
 [Canton pills row: GE VD FR VS JU — all on by default, toggleable]
+[Section label: "Deck"]
+[Deck mode pills: Events | Evergreen | Both]
+[Deck mode sub-caption]
 [CTA button: "Start swiping →"]
 ```
 
 **Behaviour:**
-- Default dates: next Saturday → Sunday (computed with date-fns).
+- Default dates: next Saturday → Sunday (computed with `date-fns`).
+- Default deck mode: `events`.
 - At least 1 canton must remain active (prevent deselecting all).
-- On "Start swiping": fetch `/activities?cantons=...` + `/events?date_from=...&date_to=...&cantons=...`, merge into deck (events first, then activities sorted by pref score), navigate to `/swipe`.
-- Show loading spinner during fetch.
-
----
+- On "Start swiping": fetch `/activities?cantons=...` and/or `/events?date_from=...&date_to=...&cantons=...` in parallel, merge (events first, then evergreen sorted by `pref_score DESC`), truncate each pool to 20, navigate to `/swipe`.
+- Show loading spinner during fetch; surface errors with an alert.
 
 ### SwipePage (`/swipe`)
 
@@ -131,30 +137,31 @@ Use `<Navigate>` to redirect `/` → `/swipe` if dateFrom is already set.
 
 **Layout (mobile):**
 ```
-[Top bar: title "Discover" | dates | "Basket (N)" button]
+[Top bar: title "Discover" | "Basket (N)" pill button]
 [Progress bar: 0–100% based on deckIndex/deck.length]
-[Card stack: top card + 2 ghost cards behind]
+[Card stack: top card + 2 ghost cards behind, 3:4 aspect ratio]
 [Action buttons: ✕ Pass | ↑ Basket | ♥ Favourite]
 [Hint labels: Pass | Basket | Favourite]
 ```
 
 **Card anatomy:**
 ```
-[Photo: full width, 200px tall, object-cover, lazy loaded]
-  [Badge: "This weekend" (amber) | "Evergreen" (green)]
+[Photo: 16:10 aspect, object-cover, lazy loaded]
+  [Type badge top-left: "This weekend" (amber) | "Evergreen" (green)]
+  [Swipe overlays: FAVOURITE / PASS / IN BASKET — appear on drag]
 [Card body:]
   [Title: 17px semibold]
-  [Meta row: 📍 Canton | ⏱ Duration | 🏷 Tag]
-  [Description: 2 lines, truncated]
-  [Link row: [🗺 Maps] [↗ Website] — tappable, open in new tab]
+  [Meta row: 📍 Canton | ⏱ Duration | 🏷 Tag chips]
+  [Address: 2 lines, truncated]
+  [Primary link: "View on myswitzerland.com" (events) | "Open in Maps" (evergreen)]
+  [Secondary links: 🗺 Maps, ↗ Website]
 ```
 
 **Swipe gestures (use-gesture + react-spring):**
 - Drag horizontally → rotate card up to ±15deg
-- Drag up → show blue "↑ In basket" overlay
-- Drag right >80px → green "♥ Favourite" overlay → vote('yes')
-- Drag left >80px → red "✕ Pass" overlay → vote('no')
-- Drag up >60px → blue "↑ In basket" overlay → vote('up')
+- Drag right > ~40px → green "FAVOURITE" overlay → vote('yes')
+- Drag left < ~−40px → red "PASS" overlay → vote('no')
+- Drag up > ~−40px → blue "IN BASKET" overlay → vote('up')
 - Button taps call same vote() function
 - Card animates off screen on confirm (flyOut left/right/up)
 - Next card springs up from stack
@@ -162,17 +169,15 @@ Use `<Navigate>` to redirect `/` → `/swipe` if dateFrom is already set.
 **On vote:**
 1. Update `deckIndex` in store.
 2. POST `/prefs` with `{activity_id, direction, session_id}`.
-3. If `direction === 'up'`: add to `currentBasket` in store. Auto-save basket to DB (debounced 2s).
-4. If `direction === 'yes'`: add to `currentBasket` AND mark as favourite locally.
+3. If `direction === 'up'`: add to `currentBasket` in store.
+4. If `direction === 'yes'`: add to `currentBasket` AND mark as favourite via the pref score.
 
 **End of deck:**
-- Show done screen: "All done! N activities in your basket."
-- Button: "See your basket →" → navigate to `/basket`.
-- Also show: "Swipe more" button → re-fetches deck with offset (if more available).
+- Show celebration screen: "All done!" with basket count.
+- Primary button: "See your basket →" → navigate to `/basket`.
+- Secondary button: "Plan a new weekend" → navigate to `/`.
 
 **Basket shortcut:** tapping "Basket (N)" in top bar navigates to `/basket` mid-swipe. Returning to `/swipe` resumes at `deckIndex`.
-
----
 
 ### BasketPage (`/basket`)
 
@@ -182,24 +187,31 @@ Use `<Navigate>` to redirect `/` → `/swipe` if dateFrom is already set.
 ```
 [Top bar: "Your basket" + "New weekend" button]
 [Subtitle: date range]
-[Tab bar: "This weekend" | "Favourites" | "History"]
+[Tab bar: "This weekend (N)" | "Favourites (N)" | "History (N)"]
 [Panel content below]
 ```
+
+Each tab shows a live count chip in the tab bar.
 
 **Tab: This weekend**
 
 List of `currentBasket` activities:
 ```
-[Thumbnail 44px] [Title + Canton · Duration] [🗺] [↗] [🗑]
+[Thumbnail 56px] [Title + Canton · Duration] [📅 events] [🗺 maps] [↗ site] [🗑]
 ```
-- Maps and website icons open in new tab.
-- Trash icon removes from basket (updates store + PATCH /baskets/:id).
-- Bottom: "Archive & plan new weekend" button → POST basket to `/baskets`, clear store, navigate to `/`.
+- Maps, website, and event-source icons open in new tab.
+- Trash icon removes from basket (updates store only).
+- Empty state: 🧺 + "No activities yet — swipe up to add things."
+- Bottom CTA: "Archive & plan new weekend" → POST basket to `/baskets`, clear store, navigate to `/`.
 
 **Tab: Favourites**
 
-All activities ever voted 'yes' (pulled from `/prefs` where score ≥ 2, hydrated with activity details).
-Same row format as basket. "+ Add to basket" icon instead of trash.
+Activities where `prefs.score >= 2`, hydrated with full activity details fetched via `GET /activities?cantons=...` and filtered by id.
+```
+[Thumbnail 56px] [Title + Canton · Duration] [🗺 maps] [↑ add-to-basket]
+```
+- If no favourites: ♥ + "No favourites yet — swipe right on activities you love."
+- If none match the current canton selection: "Couldn't find favourite activities in the current canton selection — try enabling more cantons."
 
 **Tab: History**
 
@@ -208,42 +220,42 @@ List of archived baskets from `/baskets?session_id=...`:
 [Date range]           [N activities]
 [Activity 1 · Activity 2 · ...]
 ```
-Tap a row → `/basket/:id` → full detail view of that archived basket (read-only, with maps/website links).
+- Tapping the row navigates to `/basket/:id`.
+- Inline "Delete" button removes the basket.
+
+### BasketDetailPage (`/basket/:id`)
+
+Read-only view of a single archived basket. Same `BasketItem` row layout as the "This weekend" tab minus the trash icon.
 
 ---
 
 ## Components
 
+The pages currently co-locate their sub-components. When extracted, follow the names below.
+
 ### `<SwipeCard>`
 
-Props: `activity: Activity, style: SpringValues, bind: BindFunction`
-Renders card HTML. Photo with fallback emoji. Maps + website links.
+Props: `activity: Activity, isTop: boolean, spring: SpringValues`
+Renders the card. Photo uses `PhotoOrEmoji`. Maps + website links.
 
-### `<CardStack>`
+### `<PhotoOrEmoji>`
 
-Manages the spring animations for 3 stacked cards.
-Uses `useSprings(3, ...)` from react-spring.
-Handles drag binding via `useDrag` from @use-gesture/react.
+Props: `src?: string, alt: string, emoji: string`
+Always renders an `<img>` with `onError` → emoji fallback. Used by `SwipeCard`.
 
-### `<CantonFilter>`
+### `<ThumbnailOrEmoji>`
 
-Props: `active: string[], onChange: (cantons: string[]) => void`
-Renders 5 pill buttons. Always keeps at least 1 active.
+Props: `src?: string | null, alt: string`
+56×56 thumbnail variant of `PhotoOrEmoji` used in basket/favourite/history rows.
 
-### `<BasketItem>`
+### `<ActionButton>`
 
-Props: `activity: Activity, onRemove?: () => void, onAdd?: () => void`
-Used in basket panel and favourites panel.
+Props: `label: string, symbol: string, color: 'red' | 'blue' | 'green', onClick: () => void`
+64×64 circular button below the card with a label underneath.
 
-### `<ProgressBar>`
+### `<BasketItem>` / `<FavouriteItem>` / `<HistoryTab>`
 
-Props: `value: number (0–1)`
-Thin bar, animates width via CSS transition.
-
-### `<BottomNav>` (optional for v1)
-
-Fixed bottom navigation for mobile: Discover | Basket | History.
-Show only after first swipe session started.
+Used in `BasketPage.tsx`.
 
 ---
 
@@ -253,12 +265,14 @@ Show only after first swipe session started.
 // src/api.ts
 const BASE = import.meta.env.VITE_API_URL ?? '/api/v1';
 
-export async function fetchActivities(cantons: string[]): Promise<Activity[]>
-export async function fetchEvents(from: string, to: string, cantons: string[]): Promise<Activity[]>
+export async function fetchActivities(cantons: Canton[], sessionId?: string): Promise<Activity[]>
+export async function fetchEvents(dateFrom: string, dateTo: string, cantons: Canton[]): Promise<Activity[]>
 export async function postPref(activityId: string, direction: Direction): Promise<void>
-export async function saveBasket(basket: BasketPayload): Promise<Basket>
+export async function saveBasket(dateFrom: string, dateTo: string, activityIds: string[]): Promise<Basket>
 export async function fetchBaskets(): Promise<Basket[]>
+export async function fetchBasket(id: string): Promise<Basket>
 export async function deleteBasket(id: string): Promise<void>
+export async function fetchFavourites(): Promise<{ activity_id: string; score: number }[]>
 ```
 
 All functions read `getSessionId()` and inject it automatically.
@@ -275,13 +289,13 @@ export default defineConfig({
   plugins: [react(), VitePWA({ ... })],
   server: {
     proxy: {
-      '/api': 'http://localhost:8000'
+      '/api': 'http://localhost:8002'
     }
   }
 })
 ```
 
-Proxy ensures no CORS issues in dev. In production, configure reverse proxy (nginx or platform-level).
+Proxy ensures no CORS issues in dev. In production, configure a reverse proxy (nginx or platform-level).
 
 ---
 

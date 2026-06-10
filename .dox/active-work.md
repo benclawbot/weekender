@@ -4,5 +4,3 @@
 
 | Agent | Task | Start Time | Affected Paths |
 |-------|------|------------|----------------|
-
-EOF

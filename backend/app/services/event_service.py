@@ -85,8 +85,12 @@ class EventService:
         date_to: str,
         cantons: list[str],
     ) -> list[Activity]:
-        """Scrape events from agenda.ch for selected cantons."""
-        from app.scrapers.agenda_ch import scrape_events_for_cantons
+        """Scrape events from myswitzerland.com for selected cantons.
+
+        Only VD is wired up in the scraper today; other cantons return no
+        events from the live scrape and fall through to the DB cache.
+        """
+        from app.scrapers.myswiss_com import scrape_events_for_cantons
 
         scraped = await scrape_events_for_cantons(date_from, date_to, cantons)
 

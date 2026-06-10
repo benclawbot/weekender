@@ -1,15 +1,29 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
 import { format, nextSaturday, nextSunday } from 'date-fns'
-import { useStore } from '../store'
+import { useStore, type DeckMode } from '../store'
 import { fetchActivities, fetchEvents } from '../api'
-import type { Canton } from '../lib/types'
+import type { Activity } from '../lib/types'
 import { ALL_CANTONS, CANTON_LABELS } from '../lib/types'
+
+const DECK_MODES: { id: DeckMode; label: string; sub: string }[] = [
+  { id: 'events', label: 'Events', sub: 'Weekend events in Vaud' },
+  { id: 'evergreen', label: 'Evergreen', sub: 'Always-available activities' },
+  { id: 'both', label: 'Both', sub: 'Mix events and activities' },
+]
 
 export default function SetupPage() {
   const navigate = useNavigate()
-  const { dateFrom, dateTo, activeCantons, setDates, toggleCanton, setDeck } = useStore()
+  const {
+    dateFrom,
+    dateTo,
+    activeCantons,
+    deckMode,
+    setDates,
+    toggleCanton,
+    setDeckMode,
+    setDeck,
+  } = useStore()
 
   const [loading, setLoading] = useState(false)
 
@@ -23,17 +37,27 @@ export default function SetupPage() {
   const handleStart = async () => {
     setLoading(true)
     try {
+      const wantEvents = deckMode === 'events' || deckMode === 'both'
+      const wantEvergreen = deckMode === 'evergreen' || deckMode === 'both'
+
       const [activities, events] = await Promise.all([
-        fetchActivities(cantons),
-        fetchEvents(from, to, cantons),
+        wantEvergreen ? fetchActivities(cantons) : Promise.resolve<Activity[]>([]),
+        wantEvents ? fetchEvents(from, to, cantons) : Promise.resolve<Activity[]>([]),
       ])
 
-      // Events first, then activities sorted by pref_score
-      const merged = [...events, ...activities].sort((a, b) => {
-        const scoreA = a.pref_score ?? 0
-        const scoreB = b.pref_score ?? 0
-        return scoreB - scoreA
-      })
+      // Truncate each pool to keep the deck a reasonable size; the per-canton
+      // event scrape is capped at 20, and 20 evergreen per canton is plenty.
+      const MAX_PER_POOL = 20
+      const trimmedEvents = events.slice(0, MAX_PER_POOL)
+      const trimmedEvergreen = activities.slice(0, MAX_PER_POOL)
+
+      // Events first (so the user always sees time-bound stuff up top), then
+      // evergreen sorted by pref_score DESC. Within each pool the source
+      // order is preserved.
+      const merged = [
+        ...trimmedEvents,
+        ...trimmedEvergreen.sort((a, b) => (b.pref_score ?? 0) - (a.pref_score ?? 0)),
+      ]
 
       setDates(from, to)
       setDeck(merged)
@@ -51,11 +75,11 @@ export default function SetupPage() {
       <div className="mb-8">
         <h1 className="text-3xl font-semibold text-text">Plan your weekend</h1>
         <p className="text-muted mt-1 text-sm">
-          {cantons.map((c) => CANTON_LABELS[c as Canton]).join(' · ')}
+          Pick your dates, choose your cantons, and we'll curate a deck just for you.
         </p>
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-6">
         <div>
           <label className="block text-sm font-medium text-text mb-2">Dates</label>
           <div className="grid grid-cols-2 gap-3">
@@ -94,7 +118,7 @@ export default function SetupPage() {
                   className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
                     active
                       ? 'bg-text text-bg'
-                      : 'bg-surface border border-border text-muted'
+                      : 'bg-surface border border-border text-muted hover:border-text/30'
                   }`}
                 >
                   {CANTON_LABELS[canton]}
@@ -103,13 +127,39 @@ export default function SetupPage() {
             })}
           </div>
         </div>
+
+        <div>
+          <label className="block text-sm font-medium text-text mb-2">Deck</label>
+          <div className="grid grid-cols-3 gap-2">
+            {DECK_MODES.map((m) => {
+              const active = deckMode === m.id
+              return (
+                <button
+                  key={m.id}
+                  onClick={() => setDeckMode(m.id)}
+                  className={`px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+                    active
+                      ? 'bg-text text-bg'
+                      : 'bg-surface border border-border text-muted hover:border-text/30'
+                  }`}
+                  title={m.sub}
+                >
+                  {m.label}
+                </button>
+              )
+            })}
+          </div>
+          <p className="text-xs text-muted mt-1.5">
+            {DECK_MODES.find((m) => m.id === deckMode)?.sub}
+          </p>
+        </div>
       </div>
 
-      <div className="mt-8">
+      <div className="mt-auto pt-8">
         <button
           onClick={handleStart}
           disabled={loading || activeCantons.length === 0}
-          className="w-full py-4 rounded-2xl bg-text text-bg font-semibold text-base transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
+          className="w-full py-4 rounded-2xl bg-text text-bg font-semibold text-base transition-opacity disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm"
         >
           {loading ? (
             <span className="animate-pulse">Loading...</span>

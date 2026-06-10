@@ -151,7 +151,13 @@ class ActivityService:
             return activity
 
     def photo_url_for(self, activity: Activity) -> Optional[str]:
-        """Return the public URL for an activity's photo."""
+        """Return the public URL for an activity's photo.
+
+        Prefers the remote ``photo_url`` (Wikipedia, myswiss.com CDN); falls
+        back to the locally-downloaded ``photo_path`` (Google Places scraper).
+        """
+        if activity.photo_url:
+            return activity.photo_url
         if activity.photo_path:
             return f"/uploads/photos/{os.path.basename(activity.photo_path)}"
         return None

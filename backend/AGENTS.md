@@ -4,7 +4,7 @@
 
 ## Purpose
 
-Backend API service for the WeekendPlanner app. Provides REST endpoints for activities, events, baskets, and user preferences. Manages PostgreSQL database, scraping schedulers, and learning-based recommendation scoring.
+Backend API service for the WeekendPlanner app. Provides REST endpoints for activities, events, baskets, and user preferences. Manages PostgreSQL/SQLite database, scraping schedulers, and learning-based recommendation scoring.
 
 ## Ownership
 
@@ -27,38 +27,57 @@ Backend API service for the WeekendPlanner app. Provides REST endpoints for acti
 
 All routes prefixed `/api/v1`:
 
-| Router | File | Owned By |
-|--------|------|----------|
-| `activities` | `app/api/activities.py` | This domain |
-| `events` | `app/api/events.py` | This domain |
-| `baskets` | `app/api/baskets.py` | This domain |
-| `prefs` | `app/api/prefs.py` | This domain |
+| Method | Path | File | Notes |
+|--------|------|------|-------|
+| GET | `/health` | `app/main.py` | Health check |
+| GET | `/activities` | `app/api/activities.py` | List evergreen activities (filters by canton, session_id) |
+| GET | `/events` | `app/api/events.py` | List weekend events (live scrape + DB fallback) |
+| GET | `/baskets` | `app/api/baskets.py` | List archived baskets for a session |
+| POST | `/baskets` | `app/api/baskets.py` | Archive current basket |
+| GET | `/baskets/:id` | `app/api/baskets.py` | Get archived basket |
+| DELETE | `/baskets/:id` | `app/api/baskets.py` | Delete basket |
+| PATCH | `/baskets/:id/activities/:activity_id` | `app/api/baskets.py` | Remove activity from basket |
+| GET | `/prefs` | `app/api/prefs.py` | Get pref scores for a session |
+| POST | `/prefs` | `app/api/prefs.py` | Record a vote (yes/up/no) |
 
-### Data Models
+Static uploads served at `/uploads/photos/<filename>` (mounted in `app/main.py`).
 
-| Model | File | Notes |
-|-------|------|-------|
-| `Activity` | `app/models/activity.py` | Evergreen activities from Google Places |
-| `Event` | (inline in service) | Agenda.ch events with TTL cache |
-| `Basket` | `app/api/baskets.py` | Archived activity/event collections |
-| `PreferenceVote` | `app/api/prefs.py` | Yes/No votes for learning system |
+### Data Models (`app/models/activity.py`)
 
-### Scraper Contracts
+| Model | Notes |
+|-------|-------|
+| `Activity` | Single table for both evergreen activities and events. Distinguished by `type` column. `photo_url` (remote) and `photo_path` (local upload) are mutually supporting; `ActivityService.photo_url_for` picks the right one. |
+| `Pref` | One row per (session_id, activity_id); unique constraint + index. |
+| `Basket` | Archived basket header. |
+| `BasketActivity` | Many-to-many join between baskets and activities. |
 
-| Scraper | Source | Schedule |
-|---------|--------|----------|
-| `google_places` | Google Places API | Quarterly (APScheduler) |
-| `agenda_ch` | Agenda.ch | On-demand, 6h TTL |
+### Services (`app/services/`)
 
-### Environment Variables
+| Service | Role |
+|---------|------|
+| `ActivityService` | Query/upsert activities; sort deck by learning model; resolve `photo_url_for()`. |
+| `EventService` | Live myswiss.com scrape with 6h in-memory cache; DB fallback for offline. |
 
-| Variable | Source | Required |
-|----------|--------|----------|
-| `DATABASE_URL` | `backend/.env` | No (default: sqlite+aiosqlite:///weekendplanner.db) |
-| `GOOGLE_PLACES_API_KEY` | `backend/.env` | Yes |
-| `SECRET_KEY` | `backend/.env` | Yes |
-| `ENVIRONMENT` | `backend/.env` | No (default: development) |
-| `EVENT_CACHE_TTL_HOURS` | `backend/.env` | No (default: 6) |
+### Scraper Contracts (`app/scrapers/`)
+
+| Scraper | Source | Cadence | Photo source |
+|---------|--------|---------|--------------|
+| `google_places` | Google Places v3 API | Quarterly via APScheduler | Local download to `uploads/photos/` |
+| `myswiss_com` | myswitzerland.com events | On-demand with 6h cache | `og:image` from event pages |
+| `seed_local` | Static dataset (`ACTIVITIES` + `wiki_photos.json`) | Auto-run on empty DB | Wikipedia Commons URLs |
+
+`agenda_ch.py` is kept as legacy/optional but no longer wired into the events path.
+
+### Environment Variables (`backend/.env`)
+
+| Variable | Default | Required |
+|----------|---------|----------|
+| `DATABASE_URL` | `sqlite+aiosqlite:///weekendplanner.db` | No |
+| `GOOGLE_PLACES_API_KEY` | empty | No (scraper skips if empty; `seed_local` works without) |
+| `SECRET_KEY` | `changeme` | No |
+| `ENVIRONMENT` | `development` | No |
+| `EVENT_CACHE_TTL_HOURS` | `6` | No |
+| `photos_dir` | `uploads/photos` | No (relative to `backend/`) |
 
 ## Work Guidance
 
@@ -77,9 +96,9 @@ All routes prefixed `/api/v1`:
 
 ### Adding a New Scraper
 
-1. Create `app/scrapers/<name>.py` extending `BaseScraper`
+1. Create `app/scrapers/<name>.py`
 2. Register in `app/scrapers/__init__.py`
-3. Add scheduler job in `app/scrapers/scheduler.py`
+3. Add scheduler job in `app/scrapers/scheduler.py` (if periodic)
 
 ## Verification
 
@@ -95,7 +114,7 @@ cd backend
 python -m uvicorn app.main:app --host 0.0.0.0 --port 8002
 ```
 
-Backend runs at `http://localhost:8002`. Uses SQLite (`weekendplanner.db`) by default. The dev environment auto-seeds 100 activities on first start when the table is empty.
+Backend runs at `http://localhost:8002`. Uses SQLite (`weekendplanner.db`) by default. The dev environment auto-seeds 80 activities (5 cantons × 16) on first start when the activities table is empty.
 
 ## Child DOX Index
 

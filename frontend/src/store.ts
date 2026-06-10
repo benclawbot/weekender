@@ -2,11 +2,14 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import type { Activity, Canton } from './lib/types'
 
+export type DeckMode = 'events' | 'evergreen' | 'both'
+
 interface AppStore {
   // Setup
   dateFrom: string
   dateTo: string
   activeCantons: Canton[]
+  deckMode: DeckMode
 
   // Swipe session
   deck: Activity[]
@@ -16,6 +19,7 @@ interface AppStore {
   // Actions
   setDates: (from: string, to: string) => void
   toggleCanton: (id: Canton) => void
+  setDeckMode: (mode: DeckMode) => void
   setDeck: (items: Activity[]) => void
   swipe: (direction: 'yes' | 'up' | 'no') => void
   removeFromBasket: (id: string) => void
@@ -29,6 +33,7 @@ export const useStore = create<AppStore>()(
       dateFrom: '',
       dateTo: '',
       activeCantons: ['GE', 'VD', 'FR', 'VS', 'JU'],
+      deckMode: 'events',
       deck: [],
       deckIndex: 0,
       currentBasket: [],
@@ -44,6 +49,8 @@ export const useStore = create<AppStore>()(
           if (active.length === 0) return {}
           return { activeCantons: active }
         }),
+
+      setDeckMode: (mode) => set({ deckMode: mode }),
 
       setDeck: (items) => set({ deck: items, deckIndex: 0 }),
 
@@ -78,6 +85,7 @@ export const useStore = create<AppStore>()(
         dateFrom: s.dateFrom,
         dateTo: s.dateTo,
         activeCantons: s.activeCantons,
+        deckMode: s.deckMode,
         currentBasket: s.currentBasket,
       }),
     },

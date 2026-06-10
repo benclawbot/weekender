@@ -1,4 +1,4 @@
-import type { Activity, Basket, Canton, Direction } from './types'
+import type { Activity, Basket, Canton, Direction } from './lib/types'
 import { getSessionId } from './lib/utils'
 
 const BASE = import.meta.env.VITE_API_URL || '/api/v1'

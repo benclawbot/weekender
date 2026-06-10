@@ -1,8 +1,25 @@
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
 import { fetchBasket } from '../api'
 import { CANTON_LABELS } from '../lib/types'
 import type { Activity } from '../lib/types'
+
+function ThumbnailOrEmoji({ src, alt }: { src?: string | null; alt: string }) {
+  const [errored, setErrored] = useState(false)
+  if (!src || errored) {
+    return <span className="text-2xl">🎯</span>
+  }
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className="w-full h-full object-cover"
+      loading="lazy"
+      onError={() => setErrored(true)}
+    />
+  )
+}
 
 export default function BasketDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -17,16 +34,22 @@ export default function BasketDetailPage() {
   if (isLoading) {
     return (
       <div className="flex-1 flex items-center justify-center">
-        <span className="text-muted">Loading...</span>
+        <span className="text-muted text-sm animate-pulse">Loading basket...</span>
       </div>
     )
   }
 
   if (!basket) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center">
-        <p className="text-muted">Basket not found.</p>
-        <button onClick={() => navigate('/basket')} className="mt-4 text-blue">
+      <div className="flex-1 flex flex-col items-center justify-center text-center px-6">
+        <div className="w-16 h-16 rounded-full bg-surface flex items-center justify-center text-3xl mb-3">
+          🔍
+        </div>
+        <p className="text-text font-medium">Basket not found</p>
+        <button
+          onClick={() => navigate('/basket')}
+          className="mt-4 px-5 py-2.5 rounded-xl bg-text text-bg font-medium"
+        >
           ← Back to basket
         </button>
       </div>
@@ -37,7 +60,7 @@ export default function BasketDetailPage() {
     <div className="flex-1 flex flex-col max-w-md mx-auto w-full px-4 py-6">
       <button
         onClick={() => navigate('/basket')}
-        className="flex items-center gap-1 text-sm text-muted mb-4"
+        className="flex items-center gap-1 text-sm text-muted hover:text-text transition-colors mb-4 w-fit"
       >
         ← Back
       </button>
@@ -54,21 +77,13 @@ export default function BasketDetailPage() {
             key={activity.id}
             className="flex items-center gap-3 p-3 rounded-2xl bg-surface border border-border"
           >
-            <div className="w-11 h-11 rounded-xl bg-bg flex items-center justify-center text-2xl flex-shrink-0 overflow-hidden">
-              {activity.photo_url ? (
-                <img
-                  src={activity.photo_url}
-                  alt={activity.title}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <span>🎯</span>
-              )}
+            <div className="w-14 h-14 rounded-xl bg-bg flex items-center justify-center flex-shrink-0 overflow-hidden">
+              <ThumbnailOrEmoji src={activity.photo_url} alt={activity.title} />
             </div>
             <div className="flex-1 min-w-0">
               <p className="font-medium text-sm truncate">{activity.title}</p>
-              <p className="text-xs text-muted">
-                {CANTON_LABELS[activity.canton]}
+              <p className="text-xs text-muted mt-0.5">
+                {CANTON_LABELS[activity.canton]} · {activity.duration_hint || 'Flexible'}
               </p>
             </div>
             <div className="flex gap-2 flex-shrink-0">
@@ -77,7 +92,7 @@ export default function BasketDetailPage() {
                   href={activity.source_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="w-9 h-9 rounded-full bg-bg border border-border flex items-center justify-center text-sm"
+                  className="w-9 h-9 rounded-full bg-bg border border-border flex items-center justify-center text-sm hover:bg-border/30 transition-colors"
                   aria-label="Open event source"
                 >
                   📅
@@ -88,7 +103,7 @@ export default function BasketDetailPage() {
                   href={activity.maps_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="w-9 h-9 rounded-full bg-bg border border-border flex items-center justify-center text-sm"
+                  className="w-9 h-9 rounded-full bg-bg border border-border flex items-center justify-center text-sm hover:bg-border/30 transition-colors"
                   aria-label="Open in Maps"
                 >
                   🗺
@@ -99,7 +114,7 @@ export default function BasketDetailPage() {
                   href={activity.website}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="w-9 h-9 rounded-full bg-bg border border-border flex items-center justify-center text-sm"
+                  className="w-9 h-9 rounded-full bg-bg border border-border flex items-center justify-center text-sm hover:bg-border/30 transition-colors"
                   aria-label="Open website"
                 >
                   ↗

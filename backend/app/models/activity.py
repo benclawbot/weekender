@@ -18,6 +18,7 @@ class Activity(Base):
     lng = Column(Float, nullable=True)
     opening_hours = Column(JSON, nullable=True)
     photo_path = Column(String, nullable=True)  # local path relative to uploads/
+    photo_url = Column(String, nullable=True)  # remote URL (e.g. Wikipedia, myswiss.com CDN)
     maps_url = Column(String, nullable=True)
     website = Column(String, nullable=True)
     tags = Column(JSON, default=list)
