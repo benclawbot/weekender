@@ -105,10 +105,10 @@ async def _download_photo(photo_ref: str, activity_id: str) -> Optional[str]:
     )
     os.makedirs(photos_dir, exist_ok=True)
 
-    url = f"{BASE_URL}/photo?maxwidthPx=800&photo_reference={photo_ref}&key={api_key}"
+    url = f"{BASE_URL}/photo?maxwidth=800&photo_reference={photo_ref}&key={api_key}"
 
     try:
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=30.0, follow_redirects=True) as client:
             response = await client.get(url)
             response.raise_for_status()
             content_type = response.headers.get("content-type", "image/jpeg")

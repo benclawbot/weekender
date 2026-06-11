@@ -24,9 +24,10 @@ export default defineConfig({
         runtimeCaching: [
           {
             urlPattern: '/api/v1/activities',
-            handler: 'StaleWhileRevalidate',
+            handler: 'NetworkFirst',
             options: {
-              cacheName: 'activities-cache',
+              cacheName: 'activities-cache-v2',
+              networkTimeoutSeconds: 5,
               expiration: { maxEntries: 100, maxAgeSeconds: 86400 },
             },
           },

@@ -100,6 +100,10 @@ Static uploads served at `/uploads/photos/<filename>` (mounted in `app/main.py`)
 2. Register in `app/scrapers/__init__.py`
 3. Add scheduler job in `app/scrapers/scheduler.py` (if periodic)
 
+### Activity Photos
+
+Google Places photos are downloaded to `uploads/photos/` and exposed through `/uploads/photos/<filename>`. Run `python -m app.scrapers.backfill_photos` after importing activity rows that have Google Place IDs but no local or remote photo.
+
 ## Verification
 
 - `pytest backend/tests/` — unit tests

@@ -1,4 +1,5 @@
 import pytest
+import uuid
 import pytest_asyncio
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy import delete
@@ -70,12 +71,13 @@ async def test_prefs_requires_session_id(client):
 
 @pytest.mark.asyncio
 async def test_post_pref(client):
+    session_id = f"test-session-{uuid.uuid4()}"
     response = await client.post(
         "/api/v1/prefs",
         json={
             "activity_id": "test-activity-id",
             "direction": "yes",
-            "session_id": "test-session",
+            "session_id": session_id,
         },
     )
     assert response.status_code == 200

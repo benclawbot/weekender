@@ -13,5 +13,54 @@ html, body, #root {
 }
 
 input[type="date"]::-webkit-calendar-picker-indicator {
-  opacity: 0.5;
+  opacity: 0.75;
+}
+
+body { margin: 0; background: #fff8e7; }
+button, input { font: inherit; }
+button { touch-action: manipulation; }
+
+@layer components {
+  .funky-shell {
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    background-image: radial-gradient(#161616 0.7px, transparent 0.7px), linear-gradient(120deg, rgba(255, 143, 203, 0.15), transparent 45%);
+    background-size: 18px 18px, 100% 100%;
+  }
+  .funky-shell > *:not(.funky-blob) { position: relative; z-index: 1; }
+  .funky-blob {
+    position: fixed; z-index: 0; border: 3px solid #161616; opacity: 0.9;
+    pointer-events: none; animation: floaty 9s ease-in-out infinite;
+  }
+  .funky-blob-one {
+    width: 180px; height: 180px; top: -75px; right: -65px;
+    border-radius: 42% 58% 63% 37% / 42% 39% 61% 58%; background: #ff8fcb;
+  }
+  .funky-blob-two {
+    width: 135px; height: 135px; bottom: -60px; left: -45px;
+    border-radius: 61% 39% 32% 68% / 55% 62% 38% 45%; background: #65d9ff; animation-delay: -4s;
+  }
+  .funky-card { border: 3px solid #161616; box-shadow: 7px 7px 0 #161616; }
+  .funky-button {
+    border: 3px solid #161616; box-shadow: 4px 4px 0 #161616;
+    transition: transform 150ms ease, box-shadow 150ms ease;
+  }
+  .funky-button:hover { transform: translate(-2px, -2px) rotate(-1deg); box-shadow: 6px 6px 0 #161616; }
+  .funky-button:active { transform: translate(3px, 3px); box-shadow: 1px 1px 0 #161616; }
+  .funky-kicker {
+    display: inline-flex; transform: rotate(-2deg); border: 2px solid #161616; border-radius: 999px;
+    background: #ffcf3f; padding: 0.3rem 0.75rem; color: #161616; font-size: 0.7rem;
+    font-weight: 900; letter-spacing: 0.12em; text-transform: uppercase;
+  }
+  .funky-title {
+    font-weight: 900; letter-spacing: -0.07em; line-height: 0.9; text-transform: uppercase;
+    text-shadow: 3px 3px 0 #ff8fcb;
+  }
+  .funky-input { border: 3px solid #161616; box-shadow: 3px 3px 0 #161616; }
+}
+
+@keyframes floaty {
+  0%, 100% { transform: translate(0, 0) rotate(0); }
+  50% { transform: translate(8px, 14px) rotate(7deg); }
 }

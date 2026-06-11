@@ -125,11 +125,14 @@ export default function SwipePage() {
   return (
     <div className="flex-1 flex flex-col">
       {/* Top bar */}
-      <div className="flex items-center justify-between px-4 py-3">
-        <span className="text-lg font-semibold">Discover</span>
+      <div className="flex items-center justify-between px-5 py-5">
+        <div>
+          <span className="funky-kicker">Fresh picks</span>
+          <h1 className="funky-title mt-2 text-3xl">Discover</h1>
+        </div>
         <button
           onClick={() => navigate('/basket')}
-          className="relative px-4 py-2 rounded-full bg-surface text-sm font-medium hover:bg-border/30 transition-colors"
+          className="funky-button relative px-4 py-2 rounded-full bg-amber text-sm font-black"
         >
           Basket
           {currentBasket.length > 0 && (
@@ -141,9 +144,9 @@ export default function SwipePage() {
       </div>
 
       {/* Progress bar */}
-      <div className="h-1 bg-surface mx-4 rounded-full overflow-hidden">
+      <div className="h-3 border-2 border-text bg-white mx-5 rounded-full overflow-hidden">
         <div
-          className="h-full bg-text transition-all duration-300"
+          className="h-full bg-pink transition-all duration-300"
           style={{ width: `${progress * 100}%` }}
         />
       </div>
@@ -236,7 +239,7 @@ function SwipeCard({
   })
 
   return (
-    <div className="bg-surface rounded-3xl overflow-hidden shadow-md border border-border h-full flex flex-col">
+    <div className="funky-card bg-white rounded-[2rem] overflow-hidden h-full flex flex-col">
       {/* Photo — large, 16:10 aspect, fills top half of the card */}
       <div className="relative aspect-[16/10] bg-bg overflow-hidden flex-shrink-0">
         <PhotoOrEmoji
@@ -402,7 +405,6 @@ function PhotoOrEmoji({ src, alt, emoji }: { src?: string; alt: string; emoji: s
       src={src}
       alt={alt}
       className="w-full h-full object-cover"
-      loading="lazy"
       onError={() => setErrored(true)}
     />
   )

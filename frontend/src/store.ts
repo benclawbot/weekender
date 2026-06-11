@@ -21,6 +21,7 @@ interface AppStore {
   toggleCanton: (id: Canton) => void
   setDeckMode: (mode: DeckMode) => void
   setDeck: (items: Activity[]) => void
+  mixEventsIntoDeck: (events: Activity[]) => void
   swipe: (direction: 'yes' | 'up' | 'no') => void
   removeFromBasket: (id: string) => void
   addToBasket: (activity: Activity) => void
@@ -33,7 +34,7 @@ export const useStore = create<AppStore>()(
       dateFrom: '',
       dateTo: '',
       activeCantons: ['GE', 'VD', 'FR', 'VS', 'JU'],
-      deckMode: 'events',
+      deckMode: 'both',
       deck: [],
       deckIndex: 0,
       currentBasket: [],
@@ -53,6 +54,22 @@ export const useStore = create<AppStore>()(
       setDeckMode: (mode) => set({ deckMode: mode }),
 
       setDeck: (items) => set({ deck: items, deckIndex: 0 }),
+
+      mixEventsIntoDeck: (events) =>
+        set((s) => {
+          const newEvents = events.filter((event) => !s.deck.some((item) => item.id === event.id))
+          if (newEvents.length === 0) return {}
+
+          // Keep the current card stable, then shuffle newly loaded events into the unseen deck.
+          const stableEnd = Math.min(s.deckIndex + 1, s.deck.length)
+          const stable = s.deck.slice(0, stableEnd)
+          const unseen = [...s.deck.slice(stableEnd), ...newEvents]
+          for (let i = unseen.length - 1; i > 0; i -= 1) {
+            const j = Math.floor(Math.random() * (i + 1))
+            ;[unseen[i], unseen[j]] = [unseen[j], unseen[i]]
+          }
+          return { deck: [...stable, ...unseen] }
+        }),
 
       swipe: (direction) => {
         const { deckIndex, deck, currentBasket } = get()

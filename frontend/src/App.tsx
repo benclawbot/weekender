@@ -10,7 +10,9 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      <div className="min-h-screen bg-bg flex flex-col">
+      <div className="funky-shell min-h-screen bg-bg flex flex-col text-text">
+        <div className="funky-blob funky-blob-one" />
+        <div className="funky-blob funky-blob-two" />
         <Routes>
           <Route
             path="/"

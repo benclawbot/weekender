@@ -23,7 +23,7 @@ Single-page application for the WeekendPlanner app. Provides swipe-based UI for 
 - **State**: Zustand (persisted to localStorage)
 - **Server state**: TanStack Query 5
 - **Gestures/Animation**: @use-gesture/react, react-spring
-- **PWA**: vite-plugin-pwa (stale-while-revalidate)
+- **PWA**: vite-plugin-pwa; activities use network-first caching, events use stale-while-revalidate
 
 ### Page Contracts
 
@@ -74,9 +74,9 @@ Persisted to `localStorage` under `weekend-store` (`dateFrom`, `dateTo`, `active
 
 ### Deck Composition (in `SetupPage.handleStart`)
 
-- Truncates each pool to 20.
-- Events first, then evergreen sorted by `pref_score DESC`.
-- `setDeck(merged)` puts the list in the store; `SwipePage` reads `deck.slice(deckIndex)`.
+- Loads all database-backed evergreen activities first and navigates immediately.
+- For `both` and `events` modes, requests events independently per canton and randomly mixes each result into the unseen deck.
+- Event request failures never block evergreen swiping.
 
 ### API Integration
 

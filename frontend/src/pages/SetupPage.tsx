@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { format, nextSaturday, nextSunday } from 'date-fns'
 import { useStore, type DeckMode } from '../store'
 import { fetchActivities, fetchEvents } from '../api'
-import type { Activity } from '../lib/types'
 import { ALL_CANTONS, CANTON_LABELS } from '../lib/types'
 
 const DECK_MODES: { id: DeckMode; label: string; sub: string }[] = [
@@ -23,6 +22,7 @@ export default function SetupPage() {
     toggleCanton,
     setDeckMode,
     setDeck,
+    mixEventsIntoDeck,
   } = useStore()
 
   const [loading, setLoading] = useState(false)
@@ -37,49 +37,42 @@ export default function SetupPage() {
   const handleStart = async () => {
     setLoading(true)
     try {
-      const wantEvents = deckMode === 'events' || deckMode === 'both'
-      const wantEvergreen = deckMode === 'evergreen' || deckMode === 'both'
-
-      const [activities, events] = await Promise.all([
-        wantEvergreen ? fetchActivities(cantons) : Promise.resolve<Activity[]>([]),
-        wantEvents ? fetchEvents(from, to, cantons) : Promise.resolve<Activity[]>([]),
-      ])
-
-      // Truncate each pool to keep the deck a reasonable size; the per-canton
-      // event scrape is capped at 20, and 20 evergreen per canton is plenty.
-      const MAX_PER_POOL = 20
-      const trimmedEvents = events.slice(0, MAX_PER_POOL)
-      const trimmedEvergreen = activities.slice(0, MAX_PER_POOL)
-
-      // Events first (so the user always sees time-bound stuff up top), then
-      // evergreen sorted by pref_score DESC. Within each pool the source
-      // order is preserved.
-      const merged = [
-        ...trimmedEvents,
-        ...trimmedEvergreen.sort((a, b) => (b.pref_score ?? 0) - (a.pref_score ?? 0)),
-      ]
+      const activities = await fetchActivities(cantons)
+      const evergreen = activities.sort((a, b) => (b.pref_score ?? 0) - (a.pref_score ?? 0))
+      if (evergreen.length === 0) {
+        throw new Error('No evergreen activities are available for the selected cantons.')
+      }
 
       setDates(from, to)
-      setDeck(merged)
+      setDeck(evergreen)
       navigate('/swipe')
+
+      if (deckMode !== 'evergreen') {
+        cantons.forEach((canton) => {
+          void fetchEvents(from, to, [canton])
+            .then(mixEventsIntoDeck)
+            .catch((err) => console.warn(`Failed to load events for ${canton}:`, err))
+        })
+      }
     } catch (err) {
       console.error('Failed to load activities:', err)
-      alert('Failed to load activities. Please try again.')
+      alert('The evergreen activities could not be loaded. Please check that the backend is running.')
     } finally {
       setLoading(false)
     }
   }
 
   return (
-    <div className="flex-1 flex flex-col px-4 py-8 max-w-md mx-auto w-full">
-      <div className="mb-8">
-        <h1 className="text-3xl font-semibold text-text">Plan your weekend</h1>
-        <p className="text-muted mt-1 text-sm">
+    <div className="flex-1 flex flex-col px-5 py-8 max-w-md mx-auto w-full">
+      <div className="mb-7">
+        <span className="funky-kicker mb-5">Your tiny escape machine</span>
+        <h1 className="funky-title text-5xl text-text">Plan your<br /><span className="text-blue">weekend</span></h1>
+        <p className="text-muted mt-4 text-sm font-bold">
           Pick your dates, choose your cantons, and we'll curate a deck just for you.
         </p>
       </div>
 
-      <div className="space-y-6">
+      <div className="funky-card space-y-6 rounded-[2rem] bg-white p-5">
         <div>
           <label className="block text-sm font-medium text-text mb-2">Dates</label>
           <div className="grid grid-cols-2 gap-3">
@@ -159,7 +152,7 @@ export default function SetupPage() {
         <button
           onClick={handleStart}
           disabled={loading || activeCantons.length === 0}
-          className="w-full py-4 rounded-2xl bg-text text-bg font-semibold text-base transition-opacity disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm"
+          className="funky-button w-full py-4 rounded-2xl bg-green text-text font-black text-base uppercase tracking-wider disabled:opacity-50 flex items-center justify-center gap-2"
         >
           {loading ? (
             <span className="animate-pulse">Loading...</span>
