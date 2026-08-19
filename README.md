@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/weekender-banner.svg" alt="Weekender" width="100%" />
+</p>
+
 # Weekender
 
 A family activity recommendation app for Swiss weekends. Browse evergreen activities, discover time-bound events from myswitzerland.com, and swipe to build your perfect weekend basket. The app learns from your votes and re-orders the deck to surface what your family actually likes.
