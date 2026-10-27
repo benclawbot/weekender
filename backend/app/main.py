@@ -65,6 +65,9 @@ app = FastAPI(
 
 # Static files for uploaded photos served at /uploads/photos/...
 # The photos_dir setting (uploads/photos) is relative to the backend root.
+# The directory is created on startup: it is gitignored, so a fresh clone or a
+# CI checkout does not have it and StaticFiles would raise at import time.
+os.makedirs(settings.static_uploads_dir, exist_ok=True)
 app.mount("/uploads", StaticFiles(directory=settings.static_uploads_dir), name="uploads")
 
 # CORS
